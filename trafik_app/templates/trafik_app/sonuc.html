@@ -1,0 +1,181 @@
+{% extends 'trafik_app/base.html' %} {% block title %}Tahmin Sonuçları - Avcılar
+Trafik Tahmin Sistemi{% endblock %} {% block extra_css %}
+<link rel="stylesheet" href="/static/css/custom.css" />
+{% endblock %} {% block content %}
+<div class="row">
+  <div class="col-12">
+    <h1 class="mb-4">Trafik Tahmin Sonuçları</h1>
+    <p class="lead">
+      Seçtiğiniz konum ve zaman için trafik tahmin sonuçları aşağıda
+      görüntülenmektedir.
+    </p>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header">Konum ve Zaman Bilgileri</div>
+      <div class="card-body">
+        <table class="table">
+          <tbody>
+            <tr>
+              <th scope="row">Konum:</th>
+              <td id="konumBilgisi">{{ lat }}, {{ lng }}</td>
+            </tr>
+            <tr>
+              <th scope="row">Tarih:</th>
+              <td>{{ date|date:"d.m.Y" }}</td>
+            </tr>
+            <tr>
+              <th scope="row">Seyahat Saati:</th>
+              <td>{{ time|time:"H:i" }}</td>
+            </tr>
+            <tr>
+              <th scope="row">Gün:</th>
+              <td>{{ day }}</td>
+            </tr>
+            <tr>
+              <th scope="row">Mesafe:</th>
+              <td>{{ distance }} km</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header">Tahmin Sonuçları</div>
+      <div class="card-body">
+        {% if prediction %}
+        <table class="table">
+          <tbody>
+            <tr>
+              <th scope="row">Trafik Durumu:</th>
+              <td>
+                <span class="badge text-white bg-{{ color }} p-2">
+                  {{ prediction.traffic_level }}
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <th scope="row">Tahmini Hız:</th>
+              <td>{{ prediction.predicted_speed|floatformat:1 }} km/sa</td>
+            </tr>
+            <tr>
+              <th scope="row">Tahmini Seyahat Süresi:</th>
+              <td>{{ prediction.total_time|floatformat:1 }} dakika</td>
+            </tr>
+            <tr>
+              <th scope="row">km Başına Süre:</th>
+              <td>
+                {{ prediction.predicted_time_per_km|floatformat:1 }} saniye
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        {% else %}
+        <div class="alert alert-warning">
+          Tahmin sonuçları hesaplanamadı. Lütfen tekrar deneyin.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mt-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">Konum</div>
+      <div class="card-body p-0">
+        <div class="map-container">
+          <div id="konumHaritasi" style="height: 500px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mt-4">
+  <div class="col-12 text-center">
+    <a href="{% url 'tahmin' %}" class="btn btn-primary">Yeni Tahmin Yap</a>
+    <a href="{% url 'index' %}" class="btn btn-secondary ms-2"
+      >Ana Sayfaya Dön</a
+    >
+  </div>
+</div>
+{% endblock %} {% block extra_js %}
+<script src="/static/js/map_utils.js"></script>
+<script>
+  // Değişkenleri global kapsamda tanımla
+  var latitudeValue = "{{ lat }}";
+  var longitudeValue = "{{ lng }}";
+  var distanceValue = "{{ distance }}";
+  var trafficLevelValue = "{{ color }}";
+
+  document.addEventListener("DOMContentLoaded", function () {
+    console.log("Sayfa yüklendi, harita oluşturuluyor...");
+
+    // Değerleri uygun türlere dönüştürme işlemini dikkatli yap
+    // Ondalık ayırıcı için bölgesel ayarlar sorun çıkarabilir, o yüzden noktaya çevir
+    latitudeValue = latitudeValue.replace(",", ".");
+    longitudeValue = longitudeValue.replace(",", ".");
+
+    var latitude = parseFloat(latitudeValue);
+    var longitude = parseFloat(longitudeValue);
+    var distance = parseFloat(distanceValue);
+
+    // Hata ayıklama bilgileri
+    console.log("Dönüştürülmüş konum:", latitude, longitude);
+    console.log("Mesafe:", distance);
+    console.log("Trafik seviyesi:", trafficLevelValue);
+
+    // Geçerli değerleri kontrol et
+    if (isNaN(latitude) || isNaN(longitude) || isNaN(distance)) {
+      console.error(
+        "Geçersiz konum veya mesafe değerleri:",
+        latitudeValue,
+        longitudeValue,
+        distanceValue
+      );
+      document.getElementById("konumHaritasi").innerHTML =
+        '<div class="alert alert-danger m-3">Konum bilgileri geçersiz. Lütfen tekrar deneyin.</div>';
+      return;
+    }
+
+    // Tablodaki koordinat bilgisini güncelleme gerekirse
+    var locationText = latitude.toFixed(6) + ", " + longitude.toFixed(6);
+    document.getElementById("konumBilgisi").textContent = locationText;
+
+    // Haritayı başlatmak için gecikme ekle (DOM'un hazır olmasını sağlar)
+    setTimeout(function () {
+      try {
+        // Konum haritasını başlat
+        var map = initLocationMap(
+          "konumHaritasi",
+          latitude,
+          longitude,
+          distance,
+          trafficLevelValue
+        );
+
+        // Pencere boyutu değiştiğinde haritayı yeniden boyutlandır
+        window.addEventListener("resize", function () {
+          resizeMap(map);
+        });
+
+        // Sayfa tamamen yüklendiğinde haritayı yeniden boyutlandır
+        window.addEventListener("load", function () {
+          resizeMap(map);
+        });
+      } catch (error) {
+        console.error("Harita oluşturma hatası:", error);
+        document.getElementById("konumHaritasi").innerHTML =
+          '<div class="alert alert-danger m-3">Harita yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.</div>';
+      }
+    }, 500);
+  });
+</script>
+{% endblock %}
