@@ -57,23 +57,7 @@ Trafik Tahmin Sistemi{% endblock %} {% block extra_head %}
 </div>
 
 <div class="row">
-  <div class="col-md-6">
-    <div class="card">
-      <div class="card-header">Ortalama Hız Dağılımı</div>
-      <div class="card-body">
-        {% if speed_histogram %}
-        <img
-          src="data:image/png;base64,{{ speed_histogram }}"
-          class="img-fluid"
-          alt="Hız Dağılımı"
-        />
-        {% else %}
-        <p>Histogram oluşturulamadı.</p>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-  <div class="col-md-6">
+  <div class="col-md-12">
     <div class="card">
       <div class="card-header">Trafik Tahmin Servisi</div>
       <div class="card-body">

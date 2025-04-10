@@ -277,7 +277,6 @@ def get_traffic_heatmap(force_refresh=False, max_age_hours=24):
         if cache:
             print(f"Isı haritası önbellekten yükleniyor. Nokta sayısı: {cache.point_count}")
             return cache.get_data()
-    
     print("Isı haritası yeniden hesaplanıyor...")
     df = load_and_process_data(ACTIVE_DATA_FILE)
     
