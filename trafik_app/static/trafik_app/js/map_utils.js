@@ -31,7 +31,7 @@ function initLocationMap(mapElementId, latitude, longitude, distance = 5, traffi
     
     try {
         // Haritayı başlat
-        const map = L.map(mapElementId).setView([latitude, longitude], 15);
+        const map = L.map(mapElementId).setView([latitude, longitude], 9);
         console.log('Harita oluşturuldu');
         
         // Harita katmanı ekle
@@ -105,7 +105,7 @@ function resizeMap(map) {
 }
 
 // Heatmap (ısı haritası) başlatma fonksiyonu
-function initHeatmap(mapElementId, heatmapData, center = [41.003, 28.705]) {
+function initHeatmap(mapElementId, heatmapData, center = [41.015, 28.98]) {
     console.log('initHeatmap başladı:', mapElementId);
     
     // DOM elementinin varlığını kontrol et
@@ -117,7 +117,7 @@ function initHeatmap(mapElementId, heatmapData, center = [41.003, 28.705]) {
     
     try {
         // Haritayı başlat
-        const map = L.map(mapElementId).setView(center, 14);
+        const map = L.map(mapElementId).setView(center, 9);
         console.log('Isı haritası oluşturuldu');
         
         // Harita katmanı ekle
