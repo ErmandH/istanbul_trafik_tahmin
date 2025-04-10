@@ -1,94 +1,87 @@
-{% extends 'trafik_app/base.html' %}
-
-{% block title %}Ana Sayfa - Avcılar Trafik Tahmin Sistemi{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="/static/css/custom.css">
-{% endblock %}
-
-{% block content %}
+{% extends 'trafik_app/base.html' %} {% block title %}Ana Sayfa - Avcılar Trafik
+Tahmin Sistemi{% endblock %} {% block extra_css %}
+<link rel="stylesheet" href="/static/css/custom.css" />
+{% endblock %} {% block content %}
 <div class="row">
-    <div class="col-12">
-        <h1 class="mb-4">Avcılar Trafik Tahmin Sistemi</h1>
-        <p class="lead">
-            Bu sistem, Avcılar bölgesinde 1-31 Ağustos 2024 tarihleri arasında toplanan trafik verilerini kullanarak,
-            trafik yoğunluğunu ve seyahat sürelerini tahmin eden bir makine öğrenmesi modelini kullanmaktadır.
-        </p>
-    </div>
+  <div class="col-12">
+    <h1 class="mb-4">Avcılar Trafik Tahmin Sistemi</h1>
+    <p class="lead">
+      Bu sistem, Avcılar bölgesinde 1-31 Ağustos 2024 tarihleri arasında
+      toplanan trafik verilerini kullanarak, trafik yoğunluğunu ve seyahat
+      sürelerini tahmin eden bir makine öğrenmesi modelini kullanmaktadır.
+    </p>
+  </div>
 </div>
 
 <div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                Avcılar Trafik Yoğunluğu Haritası
-            </div>
-            <div class="card-body p-0">
-                <div class="map-container">
-                    <div id="map"></div>
-                </div>
-            </div>
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">Avcılar Trafik Yoğunluğu Haritası</div>
+      <div class="card-body p-0">
+        <div class="map-container">
+          <div id="map"></div>
         </div>
+      </div>
     </div>
+  </div>
 </div>
 
 <div class="row">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                Ortalama Hız Dağılımı
-            </div>
-            <div class="card-body">
-                {% if speed_histogram %}
-                <img src="data:image/png;base64,{{ speed_histogram }}" class="img-fluid" alt="Hız Dağılımı">
-                {% else %}
-                <p>Histogram oluşturulamadı.</p>
-                {% endif %}
-            </div>
-        </div>
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header">Ortalama Hız Dağılımı</div>
+      <div class="card-body">
+        {% if speed_histogram %}
+        <img
+          src="data:image/png;base64,{{ speed_histogram }}"
+          class="img-fluid"
+          alt="Hız Dağılımı"
+        />
+        {% else %}
+        <p>Histogram oluşturulamadı.</p>
+        {% endif %}
+      </div>
     </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                Trafik Tahmin Servisi
-            </div>
-            <div class="card-body">
-                <h5 class="card-title">Trafik Tahmini Yapın</h5>
-                <p>
-                    Belirli bir konum ve zaman için trafik durumunu ve seyahat süresini tahmin etmek için tahmin aracını kullanın.
-                </p>
-                <a href="{% url 'tahmin' %}" class="btn btn-primary">Tahmin Yap</a>
-            </div>
-        </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header">Trafik Tahmin Servisi</div>
+      <div class="card-body">
+        <h5 class="card-title">Trafik Tahmini Yapın</h5>
+        <p>
+          Belirli bir konum ve zaman için trafik durumunu ve seyahat süresini
+          tahmin etmek için tahmin aracını kullanın.
+        </p>
+        <a href="{% url 'tahmin' %}" class="btn btn-primary">Tahmin Yap</a>
+      </div>
     </div>
+  </div>
 </div>
-{% endblock %}
-
-{% block extra_js %}
+{% endblock %} {% block extra_js %}
 <script src="/static/js/map_utils.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('Ana sayfa yüklendi, harita hazırlanıyor...');
-        
-        // Isı haritası verilerini al
-        const heatmapData = {{ heatmap_data|safe }};
-        console.log('Isı haritası veri sayısı:', heatmapData ? heatmapData.length : 0);
-        
-        // Harita başlatma işlemini geciktir
-        setTimeout(function() {
-            try {
-                // Isı haritasını başlat 
-                const map = initHeatmap('map', heatmapData);
-                
-                // Pencere boyutu değiştiğinde haritayı yeniden boyutlandır
-                window.addEventListener('resize', function() {
-                    resizeMap(map);
-                });
-            } catch (error) {
-                console.error('Isı haritası oluşturma hatası:', error);
-                document.getElementById('map').innerHTML = '<div class="alert alert-danger m-3">Harita yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.</div>';
-            }
-        }, 500);
-    });
+  document.addEventListener('DOMContentLoaded', function() {
+      console.log('Ana sayfa yüklendi, harita hazırlanıyor...');
+
+      // Isı haritası verilerini al
+      const heatmapData = {{ heatmap_data|safe }};
+      console.log('Isı haritası veri sayısı:', heatmapData ? heatmapData.length : 0);
+
+      // Harita başlatma işlemini geciktir
+      setTimeout(function() {
+          try {
+              // Isı haritasını başlat
+              const map = initHeatmap('map', heatmapData);
+
+              // Pencere boyutu değiştiğinde haritayı yeniden boyutlandır
+              window.addEventListener('resize', function() {
+                  resizeMap(map);
+              });
+          } catch (error) {
+              console.error('Isı haritası oluşturma hatası:', error);
+              document.getElementById('map').innerHTML = '<div class="alert alert-danger m-3">Harita yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.</div>';
+          }
+      }, 500);
+  });
 </script>
 {% endblock %}

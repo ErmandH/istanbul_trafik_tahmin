@@ -1,0 +1,1 @@
+# Bu dosya management/commands dizininin bir Python paketi olduğunu belirtir 

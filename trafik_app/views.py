@@ -5,6 +5,8 @@ from .model_utils import predict_traffic, get_traffic_heatmap, generate_speed_hi
 from .forms import TrafikForm
 import json
 from datetime import datetime
+import numpy as np
+
 
 def get_turkish_day_name(day_of_week):
     """Haftanın gün numarasına göre Türkçe gün adını döndürür"""
@@ -38,9 +40,129 @@ def index(request):
         return render(request, 'trafik_app/index.html', {'error': str(e)})
 
 def tahmin(request):
-    """Trafik tahmini formu görünümü"""
-    form = TrafikForm()
-    return render(request, 'trafik_app/tahmin.html', {'form': form})
+    if request.method == 'POST':
+        # Form verilerini al
+        route_type = request.POST.get('route_type', 'single')
+        date_str = request.POST.get('date')
+        time_str = request.POST.get('time')
+        
+        # Tarih ve saat bilgisini işle
+        try:
+            date_obj = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
+            hour = date_obj.hour
+            minute = date_obj.minute
+            day_of_week = date_obj.weekday()  # 0-6 arası (Pazartesi-Pazar)
+        except ValueError:
+            # Tarih/saat biçimi hatalıysa varsayılan değerler kullan
+            hour = 8
+            minute = 0
+            day_of_week = 0
+        
+        # Tek nokta mı yoksa rota mı olduğuna göre işlem yap
+        if route_type == 'single':
+            # Tek nokta tahmini
+            lat = float(request.POST.get('lat', 0))
+            lng = float(request.POST.get('lng', 0))
+            
+            # Modele girdi verilerini hazırla
+            input_data = [lat, lng, hour, minute, day_of_week]
+            
+            # Tahmin yap
+            prediction = predict_traffic(input_data)
+            
+            # Trafik seviyesini ve rengini al
+            traffic_level = get_traffic_level(prediction)
+            traffic_color = get_traffic_color(traffic_level)
+            
+            # Sonuç nesnesini oluştur
+            result = {
+                'lat': lat,
+                'lng': lng,
+                'traffic_level': traffic_level,
+                'traffic_color': traffic_color,
+                'prediction': prediction,
+                'route_type': 'single',
+                'date': date_obj.strftime('%d.%m.%Y'),
+                'time': date_obj.strftime('%H:%M')
+            }
+            
+            # Sonuç sayfasını göster
+            return render(request, 'trafik_app/sonuc.html', {'result': result})
+        else:
+            # Rota tahmini
+            start_point = request.POST.get('start_point', '')
+            end_point = request.POST.get('end_point', '')
+            route_coordinates_str = request.POST.get('route_coordinates', '[]')
+            distance = float(request.POST.get('distance', 1.0))
+            
+            # Koordinatları parse et
+            try:
+                route_coordinates = json.loads(route_coordinates_str)
+                # Start ve end point'leri ayır
+                start_lat, start_lng = map(float, start_point.split(','))
+                end_lat, end_lng = map(float, end_point.split(','))
+            except:
+                # Parse hatası durumunda boş liste
+                route_coordinates = []
+                start_lat, start_lng = 41.0082, 28.9784
+                end_lat, end_lng = 41.0255, 29.0097
+            
+            # Rotadaki her nokta için trafik tahmini yap
+            route_predictions = []
+            route_traffic_levels = []
+            
+            for point in route_coordinates:
+                if len(point) >= 2:
+                    lat, lng = point[0], point[1]
+                    input_data = [lat, lng, hour, minute, day_of_week]
+                    prediction = predict_traffic(input_data)
+                    traffic_level = get_traffic_level(prediction)
+                    traffic_color = get_traffic_color(traffic_level)
+                    
+                    route_predictions.append({
+                        'lat': lat,
+                        'lng': lng,
+                        'prediction': float(prediction),
+                        'traffic_level': traffic_level,
+                        'traffic_color': traffic_color
+                    })
+                    
+                    route_traffic_levels.append(traffic_level)
+            
+            # Ortalama trafik seviyesini hesapla
+            if route_traffic_levels:
+                avg_traffic_level = round(sum(route_traffic_levels) / len(route_traffic_levels))
+            else:
+                avg_traffic_level = 0
+            
+            # Ortalama trafik rengi
+            avg_traffic_color = get_traffic_color(avg_traffic_level)
+            
+            # Ortalama hız tahmini (varsayılan)
+            estimated_speed = max(10, 60 - (avg_traffic_level * 10))
+            estimated_duration = (distance / estimated_speed) * 60  # dakika cinsinden
+            
+            # Sonuç nesnesini oluştur
+            result = {
+                'route_type': 'route',
+                'start_point': {'lat': start_lat, 'lng': start_lng},
+                'end_point': {'lat': end_lat, 'lng': end_lng},
+                'route_coordinates': route_coordinates,
+                'route_predictions': route_predictions,
+                'avg_traffic_level': avg_traffic_level,
+                'avg_traffic_color': avg_traffic_color,
+                'distance': distance,
+                'estimated_speed': estimated_speed,
+                'estimated_duration': round(estimated_duration),
+                'date': date_obj.strftime('%d.%m.%Y'),
+                'time': date_obj.strftime('%H:%M')
+            }
+            
+            # Sonuç sayfasını göster
+            return render(request, 'trafik_app/sonuc.html', {'result': result})
+    
+    # GET isteği durumunda tahmin formunu göster
+    return render(request, 'trafik_app/tahmin.html')
 
 def sonuc(request):
     """Tahmin sonuçları görünümü"""
@@ -53,8 +175,23 @@ def sonuc(request):
             location = form.cleaned_data['konum']
             distance = form.cleaned_data['mesafe']
             
+            # Yeni rota bilgileri
+            start_point = request.POST.get('start_point', '')
+            end_point = request.POST.get('end_point', '')
+            route_coordinates_json = request.POST.get('route_coordinates', '')
+            
             # Debug bilgisi
             print(f"Form verileri: tarih={date_obj} ({type(date_obj)}), saat={time_obj} ({type(time_obj)})")
+            print(f"Başlangıç: {start_point}, Bitiş: {end_point}, Mesafe: {distance}")
+            
+            # Rota koordinatlarını işle
+            route_points = []
+            if route_coordinates_json:
+                try:
+                    route_points = json.loads(route_coordinates_json)
+                    print(f"Rota noktaları yüklendi. Toplam {len(route_points)} nokta.")
+                except json.JSONDecodeError:
+                    print("Rota koordinatları geçersiz JSON formatında.")
             
             # Haftanın gününü belirle
             day_of_week = date_obj.weekday()
@@ -73,16 +210,78 @@ def sonuc(request):
                     print(f"Konum bilgisi: {lat}, {lng}, türleri: {type(lat)}, {type(lng)}")
                 except (ValueError, IndexError, TypeError) as e:
                     print(f"Konum ayrıştırma hatası: {e}")
-                    lat, lng = "41.003", "28.705"  # Varsayılan değerler
+                    lat, lng = "41.013", "28.955"  # Varsayılan değerler (İstanbul)
             else:
-                lat, lng = "41.003", "28.705"  # Varsayılan değerler
+                lat, lng = "41.013", "28.955"  # Varsayılan değerler (İstanbul)
             
-            # Tahmin yap - time_obj ve day_of_week direk olarak geçir
-            prediction = predict_traffic(time_obj, day_of_week, lat, lng, distance)
+            # Başlangıç ve bitiş noktaları için koordinatları ayır
+            start_lat, start_lng = None, None
+            end_lat, end_lng = None, None
             
-            # Trafik seviyesi bilgisini getir
-            traffic_level = prediction['traffic_level']
-            color = get_traffic_color(traffic_level)
+            if start_point and ',' in start_point:
+                start_lat, start_lng = start_point.split(',')
+            
+            if end_point and ',' in end_point:
+                end_lat, end_lng = end_point.split(',')
+            
+            # Rota boyunca trafik tahminleri
+            route_predictions = []
+            route_colors = []
+            overall_speed = 0
+            overall_time = 0
+            sample_points = []
+            
+            if len(route_points) > 0:
+                # Rota noktalarından bir alt küme seç (uzun rotalarda performans için)
+                step = max(1, len(route_points) // 10)  # En fazla 10 nokta
+                sample_points = route_points[::step]
+                
+                # Rota boyunca farklı noktalar için trafik tahminleri yap
+                for i, point in enumerate(sample_points):
+                    point_lat, point_lng = point
+                    
+                    # Her nokta için mesafeyi orantılı hesapla
+                    point_distance = float(distance) / len(sample_points)
+                    
+                    # Tahmin yap
+                    prediction = predict_traffic(time_obj, day_of_week, point_lat, point_lng, point_distance)
+                    traffic_level = prediction['traffic_level']
+                    color = get_traffic_color(traffic_level)
+                    
+                    route_predictions.append(prediction)
+                    route_colors.append(color)
+                    
+                    # Toplam hız ve süre hesapla
+                    overall_speed += prediction['predicted_speed']
+                    overall_time += prediction['predicted_time_per_km'] * point_distance
+                
+                # Ortalama değerleri hesapla
+                if len(route_predictions) > 0:
+                    overall_speed = overall_speed / len(route_predictions)
+                    traffic_level = get_traffic_level(overall_speed)
+                    main_color = get_traffic_color(traffic_level)
+                else:
+                    # Rota tahmini yapılamadıysa, merkez konum için tek tahmin yap
+                    prediction = predict_traffic(time_obj, day_of_week, lat, lng, distance)
+                    traffic_level = prediction['traffic_level']
+                    main_color = get_traffic_color(traffic_level)
+                    overall_speed = prediction['predicted_speed']
+                    overall_time = prediction['predicted_time_per_km'] * float(distance)
+            else:
+                # Rota yoksa tek bir nokta için tahmin yap
+                prediction = predict_traffic(time_obj, day_of_week, lat, lng, distance)
+                traffic_level = prediction['traffic_level']
+                main_color = get_traffic_color(traffic_level)
+                overall_speed = prediction['predicted_speed']
+                overall_time = prediction['predicted_time_per_km'] * float(distance)
+            
+            # Toplam trafik tahmini
+            overall_prediction = {
+                'predicted_speed': overall_speed,
+                'predicted_time_per_km': overall_time / float(distance) if float(distance) > 0 else 0,
+                'total_time': overall_time,
+                'traffic_level': traffic_level
+            }
             
             # Heatmap için veri
             heatmap_data = get_traffic_heatmap()
@@ -92,17 +291,23 @@ def sonuc(request):
             
             # Verileri template'e gönder
             context = {
-                'prediction': prediction,
-                'color': color,
+                'prediction': overall_prediction,
+                'route_predictions': route_predictions,
+                'route_colors': route_colors,
+                'sample_points': sample_points,
+                'color': main_color,
                 'date': date_obj,
                 'time': time_obj,
                 'day': day_name,
                 'location': f"{lat},{lng}",
+                'start_point': start_point,
+                'end_point': end_point,
                 'distance': distance,
                 'heatmap_data': json.dumps(heatmap_data),
                 'speed_data': speed_data,
                 'lat': lat,
-                'lng': lng
+                'lng': lng,
+                'route_coordinates': json.dumps(route_points)
             }
             return render(request, 'trafik_app/sonuc.html', context)
     else:
@@ -113,8 +318,8 @@ def trafik_verisi(request):
     """API görünümü - trafik verisi JSON olarak döndürür"""
     try:
         # URL parametrelerini al
-        lat = float(request.GET.get('lat', 41.003))
-        lng = float(request.GET.get('lng', 28.705))
+        lat = float(request.GET.get('lat', 41.013))
+        lng = float(request.GET.get('lng', 28.955))
         time_of_day = request.GET.get('time', '08:00')
         day_of_week = request.GET.get('day', 'pazartesi')
         distance = float(request.GET.get('distance', 5.0))

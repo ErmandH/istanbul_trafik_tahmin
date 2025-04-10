@@ -1,214 +1,223 @@
-{% extends 'trafik_app/base.html' %} {% block title %}Trafik Tahmini - Avcılar
-Trafik Tahmin Sistemi{% endblock %} {% block extra_css %}
-<link rel="stylesheet" href="/static/css/custom.css" />
-{% endblock %} {% block content %}
-<div class="row">
-  <div class="col-12">
-    <h1 class="mb-4">Trafik Tahmini</h1>
-    <p class="lead">
-      Belirli bir konum, tarih ve saat için trafik tahminleri yapın. Haritadan
-      bir konum seçin veya koordinatları girin.
-    </p>
-  </div>
-</div>
+{% extends 'trafik_app/base.html' %} {% load static %} {% block title %}Trafik
+Tahmini - İstanbul Trafik Asistanı{% endblock %} {% block extra_head %}
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+  integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+  crossorigin=""
+/>
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"
+/>
+<!-- Özel CSS dosyaları -->
+<link rel="stylesheet" href="{% static 'trafik_app/css/tahmin.css' %}" />
 
-<div class="row">
-  <div class="col-md-8">
-    <div class="card">
-      <div class="card-header">Konum Seçin</div>
-      <div class="card-body p-0">
-        <div class="map-container">
-          <div id="tahminHaritasi" style="height: 500px"></div>
-        </div>
+<!-- Önce Leaflet kütüphanesini yükle -->
+<script
+  src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+  integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+  crossorigin=""
+></script>
+<!-- Sonra Routing Machine kütüphanesini yükle -->
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
+<link rel="stylesheet" href="{% static 'trafik_app/css/tahmin.css' %}" />
+{% endblock %} {% block content %}
+<div class="container mt-4">
+  <div class="row">
+    <div class="col-md-12">
+      <div class="heading-with-icon">
+        <i class="fas fa-route"></i>
+        <h2>İstanbul Trafik Tahmini</h2>
       </div>
-      <div class="card-footer text-muted">
-        Haritada bir konuma tıklayarak seçim yapabilirsiniz.
+      <p class="lead mb-4">
+        İstanbul'da seyahatiniz için trafik tahminleri yapın. Tek bir nokta veya
+        iki nokta arasındaki trafik durumunu öğrenin.
+      </p>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-12">
+      <div class="form-card">
+        <h4 class="mb-3">Rota Türü Seçin</h4>
+        <div class="route-type-selector">
+          <div
+            class="route-type-card active"
+            id="singlePointCard"
+            onclick="toggleRouteType('single')"
+          >
+            <i class="fas fa-map-marker-alt"></i>
+            <h5>Tek Nokta</h5>
+            <p class="mb-0">Belirli bir konumda trafik durumu</p>
+          </div>
+          <div
+            class="route-type-card"
+            id="routeCard"
+            onclick="toggleRouteType('route')"
+          >
+            <i class="fas fa-route"></i>
+            <h5>İki Nokta Arası</h5>
+            <p class="mb-0">Başlangıç ve varış noktaları arasındaki rota</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
-  <div class="col-md-4">
-    <div class="card">
-      <div class="card-header">Tahmin Bilgileri</div>
-      <div class="card-body">
-        <form action="{% url 'sonuc' %}" method="post">
-          {% csrf_token %}
-          <!-- Form hata mesajları -->
-          {% if form.non_field_errors %}
-          <div class="alert alert-danger">{{ form.non_field_errors }}</div>
-          {% endif %}
 
-          <!-- Gizli konum alanı -->
-          <input type="hidden" id="konum" name="konum" value="41.003,28.705" />
+  <div class="row">
+    <div class="col-md-8">
+      <div class="form-card">
+        <div id="singlePointInstructions" class="map-instructions">
+          <i class="fas fa-info-circle"></i> Haritada bir noktaya tıklayarak
+          veya işaretçiyi sürükleyerek konum seçebilirsiniz.
+        </div>
+        <div
+          id="routeInstructions"
+          class="map-instructions"
+          style="display: none"
+        >
+          <i class="fas fa-info-circle"></i> Haritada tıklayarak başlangıç ve
+          varış noktalarını seçebilirsiniz. Noktalara tıklayıp sürükleyerek
+          konumları değiştirebilirsiniz.
+        </div>
+        <div id="map"></div>
+        <div id="routeInfo" class="mt-3">
+          <i class="fas fa-road"></i> <span id="routeDistance">0</span> km,
+          <i class="fas fa-clock"></i> <span id="routeDuration">0</span> dakika
+        </div>
+      </div>
+    </div>
 
-          <!-- Tarih alanı -->
-          <div class="mb-3">
-            <label for="id_tarih" class="form-label">Tarih</label>
-            <input
-              type="date"
-              class="form-control"
-              id="id_tarih"
-              name="tarih"
-              value="{% now 'Y-m-d' %}"
-              required
-            />
-            <div class="form-text">Trafik tahmini yapılacak tarih</div>
+    <div class="col-md-4">
+      <form method="post" action="{% url 'tahmin' %}" id="predictionForm">
+        {% csrf_token %}
+        <div class="form-card">
+          <div class="form-section-title">
+            <i class="fas fa-map-marked-alt"></i> Konum Bilgileri
           </div>
 
-          <!-- Saat alanı -->
-          <div class="mb-3">
-            <label for="id_saat" class="form-label">Seyahat Saati</label>
-            <input
-              type="time"
-              class="form-control"
-              id="id_saat"
-              name="saat"
-              value="08:00"
-              required
-            />
-            <div class="form-text">Trafik tahmini yapılacak saat</div>
-          </div>
-
-          <!-- Konum gösterge alanları (kullanıcı için bilgi amaçlı) -->
-          <div class="mb-3">
-            <label for="lat" class="form-label">Enlem</label>
-            <input
-              type="number"
-              step="0.000001"
-              class="form-control"
-              id="lat"
-              value="41.003"
-              readonly
-            />
-          </div>
-          <div class="mb-3">
-            <label for="lng" class="form-label">Boylam</label>
-            <input
-              type="number"
-              step="0.000001"
-              class="form-control"
-              id="lng"
-              value="28.705"
-              readonly
-            />
-          </div>
-
-          <!-- Mesafe alanı -->
-          <div class="mb-3">
-            <label for="id_mesafe" class="form-label">Mesafe (km)</label>
-            <input
-              type="number"
-              step="0.1"
-              class="form-control"
-              id="id_mesafe"
-              name="mesafe"
-              value="5.0"
-              min="0.1"
-              max="50.0"
-              required
-            />
-            <div class="form-text">
-              Seyahat etmek istediğiniz tahmini mesafe
+          <div id="singlePointFields" class="fade-transition">
+            <div class="mb-3">
+              <label for="latInput" class="form-label">Enlem</label>
+              <input
+                type="text"
+                class="form-control"
+                id="latInput"
+                name="lat"
+                readonly
+                required
+              />
+            </div>
+            <div class="mb-3">
+              <label for="lngInput" class="form-label">Boylam</label>
+              <input
+                type="text"
+                class="form-control"
+                id="lngInput"
+                name="lng"
+                readonly
+                required
+              />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Seçilen Konum</label>
+              <div class="location-badge" id="selectedPointInfo">
+                <i class="fas fa-map-marker-alt"></i> Haritadan bir konum seçin
+              </div>
             </div>
           </div>
 
+          <div
+            id="routeFields"
+            class="fade-transition fade-out"
+            style="display: none"
+          >
+            <div class="mb-3">
+              <label for="startPointInput" class="form-label"
+                >Başlangıç Noktası</label
+              >
+              <input
+                type="text"
+                class="form-control"
+                id="startPointInput"
+                name="start_point"
+                readonly
+                placeholder="Enlem, Boylam"
+              />
+              <div class="location-badge mt-2" id="startPointInfo">
+                <i class="fas fa-flag-checkered"></i> Haritadan bir başlangıç
+                noktası seçin
+              </div>
+            </div>
+            <div class="mb-3">
+              <label for="endPointInput" class="form-label"
+                >Bitiş Noktası</label
+              >
+              <input
+                type="text"
+                class="form-control"
+                id="endPointInput"
+                name="end_point"
+                readonly
+                placeholder="Enlem, Boylam"
+              />
+              <div class="location-badge mt-2" id="endPointInfo">
+                <i class="fas fa-flag"></i> Haritadan bir varış noktası seçin
+              </div>
+            </div>
+            <input
+              type="hidden"
+              id="routeCoordinatesInput"
+              name="route_coordinates"
+            />
+          </div>
+
+          <input
+            type="hidden"
+            id="routeTypeInput"
+            name="route_type"
+            value="single"
+          />
+          <input type="hidden" id="distanceInput" name="distance" value="1.0" />
+        </div>
+
+        <div class="form-card">
+          <div class="form-section-title">
+            <i class="fas fa-clock"></i> Zaman Bilgileri
+          </div>
+          <div class="mb-3">
+            <label for="dateInput" class="form-label">Tarih</label>
+            <input
+              type="date"
+              class="form-control"
+              id="dateInput"
+              name="date"
+              required
+            />
+          </div>
+          <div class="mb-3">
+            <label for="timeInput" class="form-label">Saat</label>
+            <input
+              type="time"
+              class="form-control"
+              id="timeInput"
+              name="time"
+              required
+            />
+          </div>
+        </div>
+
+        <div class="form-card">
           <button type="submit" class="btn btn-primary w-100">
-            Tahmin Yap
+            <i class="fas fa-search"></i> Trafik Tahmini Yap
           </button>
-        </form>
-      </div>
+        </div>
+      </form>
     </div>
   </div>
 </div>
-{% endblock %} {% block extra_js %}
-<script src="/static/js/map_utils.js"></script>
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    console.log("Tahmin sayfası yüklendi, harita başlatılıyor...");
 
-    // Varsayılan konum (Avcılar)
-    var defaultLat = 41.003;
-    var defaultLng = 28.705;
-
-    // Form alanları
-    var latInput = document.getElementById("lat");
-    var lngInput = document.getElementById("lng");
-    var konumInput = document.getElementById("konum");
-
-    // Form değerlerini al (varsayılan değerleri kullan)
-    var initialLat = latInput ? parseFloat(latInput.value) : defaultLat;
-    var initialLng = lngInput ? parseFloat(lngInput.value) : defaultLng;
-
-    // Geçersiz değerleri kontrol et
-    if (isNaN(initialLat) || isNaN(initialLng)) {
-      initialLat = defaultLat;
-      initialLng = defaultLng;
-    }
-
-    // Harita ve işaretleyici için global değişkenler
-    var tahminHaritasi;
-    var marker;
-
-    // Haritayı başlat
-    setTimeout(function () {
-      try {
-        // Konum haritasını özel işaretleyici olmadan başlat
-        tahminHaritasi = L.map("tahminHaritasi").setView(
-          [initialLat, initialLng],
-          14
-        );
-        console.log("Harita oluşturuldu, merkez:", initialLat, initialLng);
-
-        // Harita katmanı ekle
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        }).addTo(tahminHaritasi);
-
-        // Konum bilgisi oluştur (virgülden sonra 6 basamak)
-        var latFormatted = parseFloat(initialLat.toFixed(6));
-        var lngFormatted = parseFloat(initialLng.toFixed(6));
-        var locationText =
-          "Seçilen Konum: " + latFormatted + ", " + lngFormatted;
-
-        // İşaretleyici ekle
-        marker = L.marker([initialLat, initialLng]).addTo(tahminHaritasi);
-        marker.bindPopup(locationText).openPopup();
-
-        // Harita tıklama işlevi
-        tahminHaritasi.on("click", function (e) {
-          var lat = e.latlng.lat;
-          var lng = e.latlng.lng;
-
-          // Konum bilgisini 6 basamaklı olarak göster
-          var latFormatted = parseFloat(lat.toFixed(6));
-          var lngFormatted = parseFloat(lng.toFixed(6));
-          var locationText =
-            "Seçilen Konum: " + latFormatted + ", " + lngFormatted;
-
-          // İşaretleyiciyi güncelle
-          marker.setLatLng([lat, lng]);
-          marker.bindPopup(locationText).openPopup();
-
-          // Form alanlarını güncelle (tam değerlerle)
-          latInput.value = latFormatted;
-          lngInput.value = lngFormatted;
-
-          // Gizli konum alanını güncelle (Django form için)
-          konumInput.value = latFormatted + "," + lngFormatted;
-
-          console.log("Konum seçildi:", latFormatted, lngFormatted);
-        });
-
-        // Harita yeniden boyutlandırma
-        window.addEventListener("resize", function () {
-          resizeMap(tahminHaritasi);
-        });
-      } catch (error) {
-        console.error("Harita oluşturma hatası:", error);
-        document.getElementById("tahminHaritasi").innerHTML =
-          '<div class="alert alert-danger m-3">Harita yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.</div>';
-      }
-    }, 500);
-  });
-</script>
+<!-- JavaScript dosyalarını içe aktar -->
+<script src="{% static 'trafik_app/js/tahmin.js' %}"></script>
 {% endblock %}

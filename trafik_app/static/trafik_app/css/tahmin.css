@@ -1,0 +1,139 @@
+#map {
+  height: 500px;
+  width: 100%;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  margin-bottom: 15px;
+}
+.form-card {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  margin-bottom: 20px;
+  transition: all 0.3s ease;
+}
+.heading-with-icon {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.heading-with-icon i {
+  margin-right: 10px;
+  font-size: 24px;
+  color: #007bff;
+}
+.route-type-selector {
+  display: flex;
+  margin-bottom: 20px;
+}
+.route-type-card {
+  flex: 1;
+  padding: 15px;
+  border-radius: 8px;
+  border: 2px solid #dee2e6;
+  text-align: center;
+  cursor: pointer;
+  margin: 0 5px;
+  transition: all 0.3s ease;
+}
+.route-type-card:hover {
+  border-color: #007bff;
+  background-color: #f8f9fa;
+  transform: translateY(-3px);
+}
+.route-type-card.active {
+  border-color: #007bff;
+  background-color: #e7f1ff;
+  transform: translateY(-3px);
+  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.1);
+}
+.route-type-card i {
+  font-size: 24px;
+  margin-bottom: 10px;
+  color: #007bff;
+}
+#routeInfo {
+  margin-top: 10px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 5px;
+  display: none;
+  font-weight: 500;
+  color: #343a40;
+}
+.map-instructions {
+  background-color: #e7f1ff;
+  border-left: 4px solid #007bff;
+  padding: 10px 15px;
+  margin-bottom: 15px;
+  font-size: 0.9rem;
+  border-radius: 4px;
+  color: #0056b3;
+}
+.location-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  background-color: #f8f9fa;
+  border-radius: 20px;
+  margin-top: 5px;
+  border: 1px solid #dee2e6;
+  font-size: 0.9rem;
+}
+.location-badge i {
+  margin-right: 5px;
+  color: #007bff;
+}
+.form-section-title {
+  color: #495057;
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+}
+.form-section-title i {
+  margin-right: 8px;
+  color: #007bff;
+}
+.btn-primary {
+  background-color: #007bff;
+  border-color: #007bff;
+  transition: all 0.2s ease;
+  padding: 10px 20px;
+  font-weight: 500;
+}
+.btn-primary:hover {
+  background-color: #0069d9;
+  border-color: #0062cc;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+.fade-transition {
+  transition: opacity 0.3s ease, max-height 0.5s ease;
+  max-height: 1000px;
+  opacity: 1;
+  overflow: hidden;
+}
+.fade-out {
+  opacity: 0;
+  max-height: 0;
+}
+.leaflet-routing-alt {
+  max-height: 0;
+  overflow: hidden;
+}
+.leaflet-routing-container {
+  display: none;
+}
+.leaflet-marker-icon {
+  cursor: pointer !important;
+}
+/* DivIcon marker stillerini düzeltme */
+.custom-div-icon {
+  background-color: transparent;
+  border: none;
+}
+
+
+div.leaflet-top.leaflet-right{ display: none !important; width: 0px  !important; height: 0px  !important; }
