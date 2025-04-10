@@ -27,14 +27,26 @@ def get_turkish_day_name(day_of_week):
 def index(request):
     """Ana sayfa görünümü"""
     try:
-        # Trafik yoğunluğu haritası için veri hazırla
-        heatmap_data = model_utils.get_traffic_heatmap()
-        # Hız histogramı
-        speed_histogram = model_utils.generate_speed_histogram()
+        # Force refresh parametresini al
+        force_refresh = request.GET.get('refresh', '0') == '1'
+        
+        # Admin kullanıcısıysa ve refresh isteniyorsa yenile
+        if force_refresh and request.user.is_superuser:
+            heatmap_data = model_utils.get_traffic_heatmap(force_refresh=True)
+            speed_histogram = model_utils.generate_speed_histogram(force_refresh=True)
+            refresh_message = "Isı haritası ve histogram yenilendi! Nokta sayısı: " + str(len(heatmap_data))
+        else:
+            # Normal durumda önbellekten al
+            heatmap_data = model_utils.get_traffic_heatmap(force_refresh=False)
+            speed_histogram = model_utils.generate_speed_histogram(force_refresh=False)
+            refresh_message = None
         
         context = {
             'heatmap_data': json.dumps(heatmap_data),
-            'speed_histogram': speed_histogram
+            'speed_histogram': speed_histogram,
+            'refresh_message': refresh_message,
+            'is_admin': request.user.is_superuser,
+            'points_count': len(heatmap_data)
         }
         return render(request, 'trafik_app/index.html', context)
     except Exception as e:

@@ -12,6 +12,8 @@ import io
 import base64
 from datetime import datetime
 import pickle
+from .models import TrafikHeatmapCache
+from django.core.cache import cache
 
 # Veri ve model dosya yolları
 ISTANBUL_DATA_FILE = os.path.join(settings.BASE_DIR, 'datasets', 'results_istanbul_trafik.json')
@@ -263,8 +265,20 @@ def get_traffic_color(traffic_level):
     }
     return colors.get(traffic_level, "#CCCCCC")  # Varsayılan gri renk
 
-def get_traffic_heatmap():
-    """Trafik yoğunluğu haritası için verileri hazırlar"""
+def get_traffic_heatmap(force_refresh=False, max_age_hours=24):
+    """Trafik yoğunluğu haritası için verileri hazırlar
+    
+    force_refresh: True ise, önbellek varsa bile yeniden hesaplar
+    max_age_hours: Önbelleğin geçerli olduğu maksimum süre (saat)
+    """
+    # Eğer force_refresh False ise, önbellekten veri döndürmeyi dene
+    if not force_refresh:
+        cache = TrafikHeatmapCache.get_latest_cache(max_age_hours)
+        if cache:
+            print(f"Isı haritası önbellekten yükleniyor. Nokta sayısı: {cache.point_count}")
+            return cache.get_data()
+    
+    print("Isı haritası yeniden hesaplanıyor...")
     df = load_and_process_data(ACTIVE_DATA_FILE)
     
     if df.empty:
@@ -292,10 +306,36 @@ def get_traffic_heatmap():
     else:
         heatmap_data = df[['latitude', 'longitude', 'traffic_intensity']].copy()
     
-    return heatmap_data.to_dict('records')
+    # Sonucu sözlük listesine dönüştür
+    result = heatmap_data.to_dict('records')
+    
+    # Sonucu önbelleğe kaydet
+    try:
+        cache = TrafikHeatmapCache()
+        cache.set_data(result)
+        print(f"Isı haritası önbelleğe kaydedildi. Nokta sayısı: {len(result)}")
+    except Exception as e:
+        print(f"Önbellekleme hatası: {e}")
+    
+    return result
 
-def generate_speed_histogram():
-    """Hız dağılımı histogramı oluşturur"""
+def generate_speed_histogram(force_refresh=False, max_age_hours=24):
+    """Hız dağılımı histogramı oluşturur
+    
+    force_refresh: True ise, önbellek varsa bile yeniden hesaplar
+    max_age_hours: Önbelleğin geçerli olduğu maksimum süre (saat)
+    """
+    # Cache key
+    cache_key = 'speed_histogram'
+    
+    # Eğer force_refresh False ise, önbellekten veriyi döndürmeyi dene
+    if not force_refresh:
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            print(f"Hız histogramı önbellekten yükleniyor.")
+            return cached_data
+    
+    print("Hız histogramı yeniden hesaplanıyor...")
     df = load_and_process_data(ACTIVE_DATA_FILE)
     
     if df.empty:
@@ -312,32 +352,41 @@ def generate_speed_histogram():
         image_png = buffer.getvalue()
         buffer.close()
         
-        return base64.b64encode(image_png).decode('utf-8')
+        result = base64.b64encode(image_png).decode('utf-8')
+    else:
+        plt.figure(figsize=(10, 6))
+        
+        # Aykırı değerleri filtrele
+        speed_data = df['average_speed']
+        Q1 = speed_data.quantile(0.25)
+        Q3 = speed_data.quantile(0.75)
+        IQR = Q3 - Q1
+        filtered_data = speed_data[(speed_data >= Q1 - 1.5 * IQR) & (speed_data <= Q3 + 1.5 * IQR)]
+        
+        plt.hist(filtered_data, bins=30, alpha=0.7, color='blue')
+        plt.title('İstanbul Ortalama Hız Dağılımı')
+        plt.xlabel('Hız (km/saat)')
+        plt.ylabel('Frekans')
+        plt.grid(True, linestyle='--', alpha=0.7)
+        
+        # Grafik görüntüsünü base64'e dönüştür
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format='png')
+        buffer.seek(0)
+        image_png = buffer.getvalue()
+        buffer.close()
+        
+        result = base64.b64encode(image_png).decode('utf-8')
     
-    plt.figure(figsize=(10, 6))
+    # Sonucu önbelleğe kaydet (24 saat geçerli)
+    try:
+        cache.set(cache_key, result, timeout=max_age_hours * 3600)
+        print(f"Hız histogramı önbelleğe kaydedildi. 24 saat geçerli.")
+    except Exception as e:
+        print(f"Histogram önbellekleme hatası: {e}")
     
-    # Aykırı değerleri filtrele
-    speed_data = df['average_speed']
-    Q1 = speed_data.quantile(0.25)
-    Q3 = speed_data.quantile(0.75)
-    IQR = Q3 - Q1
-    filtered_data = speed_data[(speed_data >= Q1 - 1.5 * IQR) & (speed_data <= Q3 + 1.5 * IQR)]
-    
-    plt.hist(filtered_data, bins=30, alpha=0.7, color='blue')
-    plt.title('İstanbul Ortalama Hız Dağılımı')
-    plt.xlabel('Hız (km/saat)')
-    plt.ylabel('Frekans')
-    plt.grid(True, linestyle='--', alpha=0.7)
-    
-    # Grafik görüntüsünü base64'e dönüştür
-    buffer = io.BytesIO()
-    plt.savefig(buffer, format='png')
-    buffer.seek(0)
-    image_png = buffer.getvalue()
-    buffer.close()
-    
-    return base64.b64encode(image_png).decode('utf-8')
-    
+    return result
+
 # İstanbul modeli eğitme fonksiyonu - doğrudan çağrılabilir
 def train_model_command():
     """Komut satırından çağrılabilecek model eğitim fonksiyonu"""

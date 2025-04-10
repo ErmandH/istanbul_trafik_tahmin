@@ -1,5 +1,5 @@
-{% extends 'trafik_app/base.html' %} {% block title %}Ana Sayfa - İstanbul Trafik
-Tahmin Sistemi{% endblock %} {% block extra_head %}
+{% extends 'trafik_app/base.html' %} {% block title %}Ana Sayfa - İstanbul
+Trafik Tahmin Sistemi{% endblock %} {% block extra_head %}
 <link rel="stylesheet" href="/static/trafik_app/css/custom.css" />
 {% endblock %} {% block content %}
 <div class="row">
@@ -13,14 +13,44 @@ Tahmin Sistemi{% endblock %} {% block extra_head %}
   </div>
 </div>
 
+{% if refresh_message %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  <strong>Başarılı!</strong> {{ refresh_message }}
+  <button
+    type="button"
+    class="btn-close"
+    data-bs-dismiss="alert"
+    aria-label="Kapat"
+  ></button>
+</div>
+{% endif %}
+
 <div class="row mb-4">
   <div class="col-12">
     <div class="card">
-      <div class="card-header">İstanbul Trafik Yoğunluğu Haritası</div>
+      <div
+        class="card-header d-flex justify-content-between align-items-center"
+      >
+        <span>İstanbul Trafik Yoğunluğu Haritası</span>
+        <div>
+          <span class="badge bg-info me-2"
+            >{{ points_count }} Veri Noktası</span
+          >
+          {% if is_admin %}
+          <a href="?refresh=1" class="btn btn-sm btn-warning"
+            >Haritayı Yenile</a
+          >
+          {% endif %}
+        </div>
+      </div>
       <div class="card-body p-0">
         <div class="map-container">
           <div id="map"></div>
         </div>
+      </div>
+      <div class="card-footer text-muted small">
+        Isı haritası, geçmiş trafik verilerine dayanarak oluşturulmuştur ve
+        düzenli olarak güncellenmektedir.
       </div>
     </div>
   </div>
@@ -65,7 +95,6 @@ Tahmin Sistemi{% endblock %} {% block extra_head %}
 
       // Isı haritası verilerini al
       const heatmapData = {{ heatmap_data|safe }};
-      console.table(heatmapData);
       console.log('Isı haritası veri sayısı:', heatmapData ? heatmapData.length : 0);
 
       // Harita başlatma işlemini geciktir

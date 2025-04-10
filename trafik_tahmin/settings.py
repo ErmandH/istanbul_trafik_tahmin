@@ -14,7 +14,7 @@ SECRET_KEY = 'django-insecure-1234567890abcdefghijklmnopqrstuvwxyz'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['165.227.133.219', 'istanbultrafiksistemi.site', 'www.istanbultrafiksistemi.site']
+ALLOWED_HOSTS = ['165.227.133.219', 'istanbultrafiksistemi.site', 'www.istanbultrafiksistemi.site', 'localhost', '127.0.0.1']
 
 # Application definition
 
@@ -96,4 +96,4 @@ STATICFILES_DIRS = [
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Default primary key field type
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField' 
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
