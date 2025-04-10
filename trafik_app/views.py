@@ -109,6 +109,7 @@ def tahmin(request):
                 prediction = model_utils.predict_traffic(model, formatted_date, formatted_time, lat, lng)
             
             # Trafik seviyesini ve rengini al
+            print("Prediction: ", prediction)
             traffic_level = model_utils.get_traffic_level(prediction)
             traffic_color = model_utils.get_traffic_color(traffic_level)
             

@@ -1,12 +1,12 @@
-{% extends 'trafik_app/base.html' %} {% block title %}Ana Sayfa - Avcılar Trafik
-Tahmin Sistemi{% endblock %} {% block extra_css %}
-<link rel="stylesheet" href="/static/css/custom.css" />
+{% extends 'trafik_app/base.html' %} {% block title %}Ana Sayfa - İstanbul Trafik
+Tahmin Sistemi{% endblock %} {% block extra_head %}
+<link rel="stylesheet" href="/static/trafik_app/css/custom.css" />
 {% endblock %} {% block content %}
 <div class="row">
   <div class="col-12">
-    <h1 class="mb-4">Avcılar Trafik Tahmin Sistemi</h1>
+    <h1 class="mb-4">İstanbul Trafik Tahmin Sistemi</h1>
     <p class="lead">
-      Bu sistem, Avcılar bölgesinde 1-31 Ağustos 2024 tarihleri arasında
+      Bu sistem, İstanbul bölgesinde 1-31 Ağustos 2024 tarihleri arasında
       toplanan trafik verilerini kullanarak, trafik yoğunluğunu ve seyahat
       sürelerini tahmin eden bir makine öğrenmesi modelini kullanmaktadır.
     </p>
@@ -16,7 +16,7 @@ Tahmin Sistemi{% endblock %} {% block extra_css %}
 <div class="row mb-4">
   <div class="col-12">
     <div class="card">
-      <div class="card-header">Avcılar Trafik Yoğunluğu Haritası</div>
+      <div class="card-header">İstanbul Trafik Yoğunluğu Haritası</div>
       <div class="card-body p-0">
         <div class="map-container">
           <div id="map"></div>
@@ -58,13 +58,14 @@ Tahmin Sistemi{% endblock %} {% block extra_css %}
   </div>
 </div>
 {% endblock %} {% block extra_js %}
-<script src="/static/js/map_utils.js"></script>
+<script src="/static/trafik_app/js/map_utils.js"></script>
 <script>
   document.addEventListener('DOMContentLoaded', function() {
       console.log('Ana sayfa yüklendi, harita hazırlanıyor...');
 
       // Isı haritası verilerini al
       const heatmapData = {{ heatmap_data|safe }};
+      console.table(heatmapData);
       console.log('Isı haritası veri sayısı:', heatmapData ? heatmapData.length : 0);
 
       // Harita başlatma işlemini geciktir

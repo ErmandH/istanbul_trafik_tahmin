@@ -127,8 +127,8 @@ Tahmini Sonucu - İstanbul Trafik Asistanı{% endblock %} {% block extra_head %}
         <div class="alert alert-info mt-3">
           <p><strong>Konum:</strong> {{ result.lat }}, {{ result.lng }}</p>
           <p>
-            <strong>Trafik Tahmin Değeri:</strong>
-            {{ result.prediction|floatformat:2 }}
+            <strong>Tahmini Hız:</strong>
+            {{ result.prediction|floatformat:2 }} km/sa
           </p>
         </div>
 
@@ -143,7 +143,8 @@ Tahmini Sonucu - İstanbul Trafik Asistanı{% endblock %} {% block extra_head %}
             style="background-color: {{ result.avg_traffic_color }};"
           ></span>
           <span
-            >Rota Boyunca Ortalama Trafik Yoğunluğu: {% if result.avg_traffic_level == 0 %} Çok Düşük 
+            >Rota Boyunca Ortalama Trafik Yoğunluğu: 
+            {% if result.avg_traffic_level == 0 %} Çok Düşük 
             {% elif result.avg_traffic_level == 1 %} Düşük 
             {% elif result.avg_traffic_level == 2 %} Orta 
             {% elif result.avg_traffic_level == 3 %} Yüksek 
@@ -220,7 +221,7 @@ Tahmini Sonucu - İstanbul Trafik Asistanı{% endblock %} {% block extra_head %}
     var marker = L.marker([lat, lng]).addTo(map);
     marker.bindPopup("<b>Trafik Seviyesi:</b> " +
       ["Çok Düşük", "Düşük", "Orta", "Yüksek", "Çok Yüksek"][trafficLevel] +
-      "<br>Tahmin: {{ result.prediction|floatformat:2 }}").openPopup();
+      "<br>Tahmini Hız: {{ result.prediction|floatformat:2 }} km/sa").openPopup();
 
     // Daire ekle (trafik yoğunluğu gösterimi)
     var circle = L.circle([lat, lng], {
@@ -290,7 +291,7 @@ Tahmini Sonucu - İstanbul Trafik Asistanı{% endblock %} {% block extra_head %}
             var prediction = routePredictions[i];
             segmentPath.bindPopup("<b>Trafik Seviyesi:</b> " +
               ["Çok Düşük", "Düşük", "Orta", "Yüksek", "Çok Yüksek"][prediction.traffic_level] +
-              "<br>Tahmin: " + prediction.prediction.toFixed(2));
+              "<br>Tahmini Hız: " + prediction.prediction.toFixed(2) + " km/sa");
           }
         }
       }

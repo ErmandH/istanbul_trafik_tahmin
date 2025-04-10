@@ -202,35 +202,66 @@ def predict_traffic(model, date, time, lat, lng):
     
     return prediction
 
-def get_traffic_level(speed, speed_limit=50):
-    """Hıza göre trafik yoğunluğu seviyesini belirler"""
-    if speed_limit == 0:
-        speed_limit = 50  # Varsayılan değer
+def get_traffic_level(prediction, speed_limit=50):
+    """
+    Tahmin değerine göre trafik seviyesini belirler.
     
-    # Hız limitine göre oran hesapla
-    ratio = speed / speed_limit if speed_limit > 0 else 0
+    Args:
+        prediction: Modelin ürettiği tahmin değeri (0-1 arasında)
+                  Düşük değerler iyi trafik koşullarını,
+                  Yüksek değerler kötü trafik koşullarını gösterir
+        speed_limit: Eğer prediction bir hız değeri ise, bu parametreyi kullan
     
-    if ratio >= 0.9:
-        return "Açık"
-    elif ratio >= 0.75:
-        return "Hafif"
-    elif ratio >= 0.5:
-        return "Yoğun"
-    elif ratio >= 0.3:
-        return "Çok Yoğun"
+    Returns:
+        int: 0 (Çok Düşük) ile 4 (Çok Yüksek) arasında trafik seviyesi
+    """
+    # Eğer prediction 1'den büyükse, hız değeri olarak işle
+    if prediction > 1:
+        # Hız değeri için oran hesapla
+        ratio = prediction / speed_limit if speed_limit > 0 else 0
+        
+        if ratio >= 0.9:
+            return 0  # Çok Düşük (hız yüksek = trafik az)
+        elif ratio >= 0.75:
+            return 1  # Düşük
+        elif ratio >= 0.5:
+            return 2  # Orta
+        elif ratio >= 0.3:
+            return 3  # Yüksek
+        else:
+            return 4  # Çok Yüksek (hız düşük = trafik yoğun)
     else:
-        return "Durma Noktasında"
+        # 0-1 arası bir prediction değeri için
+        if prediction < 0.2:
+            return 0  # Çok Düşük
+        elif prediction < 0.4:
+            return 1  # Düşük
+        elif prediction < 0.6:
+            return 2  # Orta
+        elif prediction < 0.8:
+            return 3  # Yüksek
+        else:
+            return 4  # Çok Yüksek
 
 def get_traffic_color(traffic_level):
-    """Trafik seviyesine göre renk döndürür - Bootstrap renk sınıflarıyla uyumlu"""
+    """
+    Trafik seviyesine göre renk kodu döndürür.
+    
+    Args:
+        traffic_level (int): 0-4 arasında trafik seviyesi
+            0: Çok Düşük, 1: Düşük, 2: Orta, 3: Yüksek, 4: Çok Yüksek
+            
+    Returns:
+        str: Hex renk kodu
+    """
     colors = {
-        "Açık": "success",     # yeşil
-        "Hafif": "warning",    # sarı
-        "Yoğun": "warning",    # sarı (Bootstrap'ta direkt "orange" yok)
-        "Çok Yoğun": "danger", # kırmızı
-        "Durma Noktasında": "dark"  # koyu renk (Bootstrap'ta "darkred" yok)
+        0: "#00FF00",  # Yeşil (Çok Düşük)
+        1: "#80FF00",  # Açık Yeşil (Düşük)
+        2: "#FFFF00",  # Sarı (Orta)
+        3: "#FF8000",  # Turuncu (Yüksek)
+        4: "#FF0000",  # Kırmızı (Çok Yüksek)
     }
-    return colors.get(traffic_level, "secondary")  # varsayılan gri
+    return colors.get(traffic_level, "#CCCCCC")  # Varsayılan gri renk
 
 def get_traffic_heatmap():
     """Trafik yoğunluğu haritası için verileri hazırlar"""
@@ -364,30 +395,6 @@ def get_day_type(date):
     # Şu an sadece hafta içi ve hafta sonu destekleniyor
     # TODO: Resmi tatil desteği eklenebilir
     return 1 if is_weekend(date) else 0
-
-# Trafik seviyesini belirle (0: Çok Düşük, 1: Düşük, 2: Orta, 3: Yüksek, 4: Çok Yüksek)
-def get_traffic_level(prediction):
-    if prediction < 0.2:
-        return 0  # Çok Düşük
-    elif prediction < 0.4:
-        return 1  # Düşük
-    elif prediction < 0.6:
-        return 2  # Orta
-    elif prediction < 0.8:
-        return 3  # Yüksek
-    else:
-        return 4  # Çok Yüksek
-
-# Trafik seviyesine göre renk kodu döndür
-def get_traffic_color(traffic_level):
-    colors = {
-        0: "#00FF00",  # Yeşil (Çok Düşük)
-        1: "#80FF00",  # Açık Yeşil (Düşük)
-        2: "#FFFF00",  # Sarı (Orta)
-        3: "#FF8000",  # Turuncu (Yüksek)
-        4: "#FF0000",  # Kırmızı (Çok Yüksek)
-    }
-    return colors.get(traffic_level, "#CCCCCC")  # Varsayılan gri renk
 
 # Route için tahmin
 def predict_route(model, date, time, route_coordinates):

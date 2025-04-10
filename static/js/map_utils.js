@@ -24,9 +24,9 @@ function initLocationMap(mapElementId, latitude, longitude, distance = 5, traffi
         return null;
     }
     
-    // Avcılar bölgesinde mantıklı değer aralığı kontrolü
-    if (latitude < 40.9 || latitude > 41.1 || longitude < 28.6 || longitude > 28.8) {
-        console.warn('Konum değerleri Avcılar bölgesi dışında olabilir:', latitude, longitude);
+    // İstanbul bölgesinde mantıklı değer aralığı kontrolü
+    if (latitude < 40.7 || latitude > 41.5 || longitude < 28.3 || longitude > 29.5) {
+        console.warn('Konum değerleri İstanbul bölgesi dışında olabilir:', latitude, longitude);
     }
     
     try {
@@ -52,24 +52,32 @@ function initLocationMap(mapElementId, latitude, longitude, distance = 5, traffi
         
         // Trafik durumuna göre işaretleyici rengi
         if (trafficLevel) {
-            // Bootstrap renk sınıflarını harita renklerine çevir
+            // Trafik seviyesine göre renk
             let circleColor;
             
-            switch(trafficLevel) {
-                case 'success':
-                    circleColor = '#28a745'; // Bootstrap yeşil
-                    break;
-                case 'warning':
-                    circleColor = '#ffc107'; // Bootstrap sarı
-                    break;
-                case 'danger':
-                    circleColor = '#dc3545'; // Bootstrap kırmızı
-                    break;
-                case 'dark':
-                    circleColor = '#343a40'; // Bootstrap koyu
-                    break;
-                default:
-                    circleColor = '#007bff'; // Bootstrap mavi
+            // HEX renk kodunu doğrudan kullanabiliriz
+            if (trafficLevel.startsWith('#')) {
+                circleColor = trafficLevel;
+            } else {
+                // Renk sınıfları için alternatif
+                switch(trafficLevel) {
+                    case 'success':
+                    case 0:
+                        circleColor = '#00FF00'; // Yeşil (Çok Düşük)
+                        break;
+                    case 'warning':
+                    case 1:
+                    case 2:
+                        circleColor = '#FFFF00'; // Sarı (Orta)
+                        break;
+                    case 'danger':
+                    case 3:
+                    case 4:
+                        circleColor = '#FF0000'; // Kırmızı (Çok Yüksek)
+                        break;
+                    default:
+                        circleColor = '#007bff'; // Varsayılan mavi
+                }
             }
             
             // Trafik durumu göstergesi
@@ -105,7 +113,7 @@ function resizeMap(map) {
 }
 
 // Heatmap (ısı haritası) başlatma fonksiyonu
-function initHeatmap(mapElementId, heatmapData, center = [41.003, 28.705]) {
+function initHeatmap(mapElementId, heatmapData, center = [41.0082, 28.9784]) {
     console.log('initHeatmap başladı:', mapElementId);
     
     // DOM elementinin varlığını kontrol et
@@ -116,8 +124,8 @@ function initHeatmap(mapElementId, heatmapData, center = [41.003, 28.705]) {
     }
     
     try {
-        // Haritayı başlat
-        const map = L.map(mapElementId).setView(center, 14);
+        // Haritayı başlat - İstanbul merkezinde
+        const map = L.map(mapElementId).setView(center, 12);
         console.log('Isı haritası oluşturuldu');
         
         // Harita katmanı ekle
