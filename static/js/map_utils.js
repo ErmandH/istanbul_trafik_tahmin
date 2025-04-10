@@ -146,22 +146,24 @@ function initHeatmap(mapElementId, heatmapData, center = [41.0082, 28.9784]) {
                 return null;
             }
             
-            // Yoğunluğa göre renk ağırlığı
-            return [lat, lng, intensity];
+            // Yoğunluğa göre ağırlık - değeri normalize et (0.1-1.0 arasında)
+            return [lat, lng, Math.max(0.1, Math.min(1.0, intensity))];
         }).filter(point => point !== null); // Null değerleri filtrele
         
         // Isı haritasını ekle
         if (heatPoints.length > 0) {
             L.heatLayer(heatPoints, {
-                radius: 20,
+                radius: 25,        // Daha fazla alan kapsaması için arttırıldı
                 blur: 15,
                 maxZoom: 17,
+                minOpacity: 0.3,   // Minimum opaklık ayarlandı
+                max: 1.0,          // Maksimum değer
                 gradient: {
-                    0.2: 'blue',
-                    0.4: 'lime',
-                    0.6: 'yellow',
-                    0.8: 'orange',
-                    1.0: 'red'
+                    0.0: '#00FF00', // Yeşil - Çok düşük trafik
+                    0.25: '#80FF00', // Açık yeşil
+                    0.5: '#FFFF00',  // Sarı - Orta seviye trafik
+                    0.75: '#FF8000', // Turuncu
+                    1.0: '#FF0000'   // Kırmızı - Çok yüksek trafik
                 }
             }).addTo(map);
             console.log('Isı haritası verileri eklendi:', heatPoints.length, 'nokta');
@@ -169,6 +171,47 @@ function initHeatmap(mapElementId, heatmapData, center = [41.0082, 28.9784]) {
             console.warn('Isı haritası için geçerli veri yok');
             mapElement.innerHTML = '<div class="alert alert-warning m-3">Isı haritası için yeterli veri bulunamadı.</div>';
         }
+        
+        // Harita ölçeği ekle
+        L.control.scale({
+            imperial: false,  // Sadece metrik göster
+            maxWidth: 200
+        }).addTo(map);
+        
+        // Trafik seviyesi lejant ekle
+        const legend = L.control({position: 'bottomright'});
+        
+        legend.onAdd = function (map) {
+            const div = L.DomUtil.create('div', 'info legend');
+            div.style.backgroundColor = 'white';
+            div.style.padding = '10px';
+            div.style.borderRadius = '5px';
+            div.style.boxShadow = '0 0 5px rgba(0,0,0,0.2)';
+            
+            div.innerHTML = '<h6 style="margin:0 0 8px 0;">Trafik Yoğunluğu</h6>';
+            
+            // Trafik seviyeleri ve renkleri
+            const grades = [
+                {level: 'Çok Düşük', color: '#00FF00'},
+                {level: 'Düşük', color: '#80FF00'},
+                {level: 'Orta', color: '#FFFF00'},
+                {level: 'Yüksek', color: '#FF8000'},
+                {level: 'Çok Yüksek', color: '#FF0000'}
+            ];
+            
+            // Renk kutuları ve etiketleri ekle
+            for (let i = 0; i < grades.length; i++) {
+                div.innerHTML +=
+                    '<div style="display:flex;align-items:center;margin-bottom:5px;">' +
+                    '<i style="background:' + grades[i].color + ';width:15px;height:15px;display:inline-block;margin-right:5px;"></i> ' +
+                    grades[i].level +
+                    '</div>';
+            }
+            
+            return div;
+        };
+        
+        legend.addTo(map);
         
         // Haritayı yeniden boyutlandır
         map.invalidateSize();

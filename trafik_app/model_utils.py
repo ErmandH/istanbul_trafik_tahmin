@@ -272,7 +272,12 @@ def get_traffic_heatmap():
         return []
     
     # Trafik yoğunluğunu hesapla
+    # Düşük hız = yüksek trafik yoğunluğu
+    # Hız limiti 50 km/sa ise ve ortalama hız 10 km/sa ise, trafik yoğunluğu 0.8 olmalı
+    # Formula: 1 - (ortalama_hız / hız_limiti)
     df['traffic_intensity'] = 1 - (df['average_speed'] / df['speed_limit'])
+    
+    # 0-1 aralığına normalizasyon
     df.loc[df['traffic_intensity'] < 0, 'traffic_intensity'] = 0
     df.loc[df['traffic_intensity'] > 1, 'traffic_intensity'] = 1
     
@@ -280,8 +285,9 @@ def get_traffic_heatmap():
     max_points = 5000  # Maksimum nokta sayısı
     
     if len(df) > max_points:
-        # Veriyi örnekle
-        df_sample = df.sample(max_points, random_state=42)
+        # Veriyi örnekle - ağırlıklı örnekleme (yüksek yoğunluklu noktaları daha fazla seç)
+        weights = df['traffic_intensity'] * 2 + 0.1  # Yüksek yoğunluklu noktalar daha fazla seçilsin
+        df_sample = df.sample(max_points, weights=weights, random_state=42)
         heatmap_data = df_sample[['latitude', 'longitude', 'traffic_intensity']].copy()
     else:
         heatmap_data = df[['latitude', 'longitude', 'traffic_intensity']].copy()
