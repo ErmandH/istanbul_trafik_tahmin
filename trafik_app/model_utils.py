@@ -163,137 +163,44 @@ def train_istanbul_model():
         'sample_count': len(df)
     }
 
-def predict_traffic(time_of_day, day_of_week, lat, lng, distance):
-    """Belirli bir saat, gün ve konum için trafik durumunu tahmin eder"""
-    # Saat bilgisini işle
-    try:
-        if isinstance(time_of_day, str):
-            # String formatındaysa saati ayır
-            hour = int(time_of_day.split(':')[0])
-            minute = int(time_of_day.split(':')[1])
-        elif hasattr(time_of_day, 'hour') and hasattr(time_of_day, 'minute'):
-            # datetime.time veya datetime.datetime nesnesi ise
-            hour = time_of_day.hour
-            minute = time_of_day.minute
-        else:
-            # Bilinmeyen format - varsayılan değerleri kullan
-            print(f"Bilinmeyen zaman formatı: {time_of_day}, tipi: {type(time_of_day)}")
-            hour = 12
-            minute = 0
-    except (ValueError, IndexError, AttributeError, TypeError) as e:
-        print(f"Zaman dönüştürme hatası: {e}")
-        hour = 12
-        minute = 0
+def predict_traffic(model, date, time, lat, lng):
+    hour = get_hour_of_day(time)
+    day_type = get_day_type(date)
     
-    print(f"Saat ve dakika: {hour}:{minute}")
+    # Modelin eğitildiği veri setine bakarak, eksik özellikler için varsayılan değerler ekliyoruz
+    speed_limit = 50  # Varsayılan hız limiti
+    distance = 1.0    # Varsayılan mesafe (km)
+    sample_size = 10000  # Varsayılan örnek sayısı
+    traffic_density = sample_size / distance  # Varsayılan yoğunluk
     
-    # Koordinat değerlerini doğru şekilde işle
-    try:
-        # Ondalık ayırıcı kontrolü
-        if isinstance(lat, str):
-            lat = lat.replace(',', '.')
-        if isinstance(lng, str):
-            lng = lng.replace(',', '.')
-            
-        # Float'a dönüştür
-        lat = float(lat)
-        lng = float(lng)
-        
-        # İstanbul için geçerli koordinat aralığı
-        if not (40.7 <= lat <= 41.5) or not (28.3 <= lng <= 29.5):
-            print(f"Uyarı: Koordinatlar İstanbul bölgesi dışında olabilir: {lat}, {lng}")
-    except (ValueError, TypeError) as e:
-        print(f"Hata: Koordinat dönüşümünde sorun: {e}")
-        # Varsayılan değerler (İstanbul merkez)
-        lat = 41.013
-        lng = 28.955
+    # Tahmin için özellikleri hazırla - modelin eğitildiği ile aynı sırada olmalı
+    X = np.array([[speed_limit, distance, sample_size, traffic_density, lat, lng]])
     
-    # Mesafe kontrolü
-    try:
-        distance = float(distance)
-        if distance <= 0:
-            distance = 1.0
-    except (ValueError, TypeError):
-        distance = 1.0
-    
-    # Gün değerini dönüştür
-    if isinstance(day_of_week, int) and 0 <= day_of_week <= 6:
-        day_num = day_of_week
-    else:
-        day_map = {
-            'pazartesi': 0, 'salı': 1, 'çarşamba': 2, 'perşembe': 3, 
-            'cuma': 4, 'cumartesi': 5, 'pazar': 6
-        }
-        
-        if isinstance(day_of_week, str) and day_of_week.lower() in day_map:
-            day_num = day_map[day_of_week.lower()]
-        else:
+    # Model bir sözlük ise
+    if isinstance(model, dict) and 'speed_model' in model:
+        # Eğer scaler varsa ölçeklendirme yap
+        scaler_path = os.path.join(settings.BASE_DIR, 'models', 'istanbul_scaler.joblib')
+        if os.path.exists(scaler_path):
             try:
-                day_num = int(day_of_week) % 7
-            except (ValueError, TypeError):
-                day_num = 0  # Varsayılan olarak Pazartesi
-    
-    # Model ve scaler'ı yükle
-    if os.path.exists(ACTIVE_MODEL_FILE) and os.path.exists(ACTIVE_SCALER_FILE):
-        models = joblib.load(ACTIVE_MODEL_FILE)
-        scaler = joblib.load(ACTIVE_SCALER_FILE)
-    else:
-        # İstanbul modeli yoksa eğit
-        if not os.path.exists(ISTANBUL_MODEL_FILE):
-            print("İstanbul modeli bulunamadı. Model eğitiliyor...")
-            metrics = train_istanbul_model()
-            models = joblib.load(ISTANBUL_MODEL_FILE)
-            scaler = joblib.load(ISTANBUL_SCALER_FILE)
-        # Eski model varsa onu kullan
-        elif os.path.exists(MODEL_FILE) and os.path.exists(SCALER_FILE):
-            print("Eski Avcılar modeli kullanılıyor...")
-            models = joblib.load(MODEL_FILE)
-            scaler = joblib.load(SCALER_FILE)
+                scaler = joblib.load(scaler_path)
+                X_scaled = scaler.transform(X)
+                prediction = model['speed_model'].predict(X_scaled)[0]
+            except Exception as e:
+                print(f"Ölçeklendirme hatası: {e}")
+                # Hata durumunda ölçeklendirme yapmadan dene
+                prediction = model['speed_model'].predict(X)[0]
         else:
-            # Son çare yeni model eğit
-            print("Hiçbir model bulunamadı. Yeni model eğitiliyor...")
-            metrics = train_istanbul_model()
-            models = joblib.load(ISTANBUL_MODEL_FILE)
-            scaler = joblib.load(ISTANBUL_SCALER_FILE)
+            # Scaler yoksa direkt tahmin yap
+            prediction = model['speed_model'].predict(X)[0]
+    else:
+        # Tek model durumu için
+        try:
+            prediction = model.predict(X)[0]
+        except AttributeError as e:
+            print(f"Model tahmin hatası: {e}")
+            prediction = 0.5
     
-    # Tahmin için girdi verisi hazırla
-    # Örnek bir trafik yoğunluğu ve hız limiti ata
-    speed_limit = 50
-    sample_size = 10000
-    traffic_density = sample_size / distance if distance > 0 else 0
-    
-    input_data = np.array([[speed_limit, distance, sample_size, traffic_density, lat, lng]])
-    input_scaled = scaler.transform(input_data)
-    
-    # Tahmin yap
-    predicted_speed = models['speed_model'].predict(input_scaled)[0]
-    predicted_time_per_km = models['time_model'].predict(input_scaled)[0]
-    
-    # Saat faktörü (trafiğin yoğun olduğu saatlerde düzeltme)
-    hour_factor = 1.0
-    if (hour >= 7 and hour <= 9) or (hour >= 17 and hour <= 19):  # Sabah ve akşam rush saatleri
-        hour_factor = 1.5
-    elif hour >= 22 or hour <= 5:  # Gece saatleri
-        hour_factor = 0.7
-    
-    # Gün faktörü (hafta içi/sonu faktörü)
-    day_factor = 1.0
-    if day_num >= 5:  # Hafta sonu
-        day_factor = 0.8
-    
-    # Faktörleri uygula
-    adjusted_speed = predicted_speed / (hour_factor * day_factor)
-    adjusted_time = predicted_time_per_km * hour_factor * day_factor
-    
-    # Trafik seviyesini belirle
-    traffic_level = get_traffic_level(adjusted_speed, speed_limit)
-    
-    return {
-        'predicted_speed': adjusted_speed,
-        'predicted_time_per_km': adjusted_time,
-        'total_time': (adjusted_time * distance) / 1000 if distance > 0 else 0,
-        'traffic_level': traffic_level  # Artık bir string değeri
-    }
+    return prediction
 
 def get_traffic_level(speed, speed_limit=50):
     """Hıza göre trafik yoğunluğu seviyesini belirler"""
@@ -420,10 +327,23 @@ def train_model_command():
 
 # Model yükleme fonksiyonu
 def load_model():
-    model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'traffic_model.pkl')
-    with open(model_path, 'rb') as f:
-        model = pickle.load(f)
-    return model
+    model_path = os.path.join(settings.BASE_DIR, 'models', 'istanbul_trafik_model.joblib')
+    
+    # Eğer model bulunamazsa, modeli eğit ve oluştur
+    if not os.path.exists(model_path):
+        print(f"Model bulunamadı: {model_path}")
+        print("Model eğitiliyor...")
+        train_istanbul_model()
+    
+    # Modeli yükle
+    try:
+        return joblib.load(model_path)
+    except Exception as e:
+        print(f"Model yükleme hatası: {e}")
+        # Yedek yol - ilk modeli eğit ve döndür
+        print("Model yeniden eğitiliyor...")
+        train_istanbul_model()
+        return joblib.load(model_path)
 
 # Hafta içi/sonu kontrolü
 def is_weekend(date):
@@ -444,19 +364,6 @@ def get_day_type(date):
     # Şu an sadece hafta içi ve hafta sonu destekleniyor
     # TODO: Resmi tatil desteği eklenebilir
     return 1 if is_weekend(date) else 0
-
-# Trafik tahmini yapma fonksiyonu
-def predict_traffic(model, date, time, lat, lng):
-    hour = get_hour_of_day(time)
-    day_type = get_day_type(date)
-    
-    # Tahmin için özellikleri hazırla
-    X = np.array([[lat, lng, hour, day_type]])
-    
-    # Tahmin yap
-    prediction = model.predict(X)[0]
-    
-    return prediction
 
 # Trafik seviyesini belirle (0: Çok Düşük, 1: Düşük, 2: Orta, 3: Yüksek, 4: Çok Yüksek)
 def get_traffic_level(prediction):

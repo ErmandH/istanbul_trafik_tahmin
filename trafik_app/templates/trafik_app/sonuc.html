@@ -114,19 +114,21 @@ Tahmini Sonucu - İstanbul Trafik Asistanı{% endblock %} {% block extra_head %}
             style="background-color: {{ result.traffic_color }};"
           ></span>
           <span
-            >Trafik Yoğunluğu: {% if result.traffic_level == 0 %} Çok Düşük {%
-            elif result.traffic_level == 1 %} Düşük {% elif result.traffic_level
-            == 2 %} Orta {% elif result.traffic_level == 3 %} Yüksek {% elif
-            result.traffic_level == 4 %} Çok Yüksek {% else %} Bilinmiyor {%
-            endif %}
+            >Trafik Yoğunluğu: {% if result.traffic_level == 0 %} Çok Düşük 
+            {% elif result.traffic_level == 1 %} Düşük 
+            {% elif result.traffic_level == 2 %} Orta 
+            {% elif result.traffic_level == 3 %} Yüksek 
+            {% elif result.traffic_level == 4 %} Çok Yüksek 
+            {% else %} Bilinmiyor 
+            {% endif %}
           </span>
         </div>
 
         <div class="alert alert-info mt-3">
           <p><strong>Konum:</strong> {{ result.lat }}, {{ result.lng }}</p>
           <p>
-            <strong>Trafik Tahmin Değeri:</strong> {{
-            result.prediction|floatformat:2 }}
+            <strong>Trafik Tahmin Değeri:</strong>
+            {{ result.prediction|floatformat:2 }}
           </p>
         </div>
 
@@ -141,13 +143,13 @@ Tahmini Sonucu - İstanbul Trafik Asistanı{% endblock %} {% block extra_head %}
             style="background-color: {{ result.avg_traffic_color }};"
           ></span>
           <span
-            >Rota Boyunca Ortalama Trafik Yoğunluğu: {% if
-            result.avg_traffic_level == 0 %} Çok Düşük {% elif
-            result.avg_traffic_level == 1 %} Düşük {% elif
-            result.avg_traffic_level == 2 %} Orta {% elif
-            result.avg_traffic_level == 3 %} Yüksek {% elif
-            result.avg_traffic_level == 4 %} Çok Yüksek {% else %} Bilinmiyor {%
-            endif %}
+            >Rota Boyunca Ortalama Trafik Yoğunluğu: {% if result.avg_traffic_level == 0 %} Çok Düşük 
+            {% elif result.avg_traffic_level == 1 %} Düşük 
+            {% elif result.avg_traffic_level == 2 %} Orta 
+            {% elif result.avg_traffic_level == 3 %} Yüksek 
+            {% elif result.avg_traffic_level == 4 %} Çok Yüksek 
+            {% else %} Bilinmiyor 
+            {% endif %}
           </span>
         </div>
 
@@ -206,8 +208,8 @@ Tahmini Sonucu - İstanbul Trafik Asistanı{% endblock %} {% block extra_head %}
 
   {% if result.route_type == 'single' %}
     // Tek nokta gösterimi
-    var lat = {{ result.lat }};
-    var lng = {{ result.lng }};
+    var lat = {{ result.lat|stringformat:"f" }};
+    var lng = {{ result.lng|stringformat:"f" }};
     var trafficLevel = {{ result.traffic_level }};
     var trafficColor = "{{ result.traffic_color }}";
 
@@ -230,10 +232,12 @@ Tahmini Sonucu - İstanbul Trafik Asistanı{% endblock %} {% block extra_head %}
 
   {% else %}
     // Rota gösterimi
-    var startPoint = [{{ result.start_point.lat }}, {{ result.start_point.lng }}];
-    var endPoint = [{{ result.end_point.lat }}, {{ result.end_point.lng }}];
+    var startPoint = [{{ result.start_point.lat |stringformat:"f" }}, {{ result.start_point.lng |stringformat:"f" }}];
+    var endPoint = [{{ result.end_point.lat |stringformat:"f" }}, {{ result.end_point.lng |stringformat:"f" }}];
     var routeCoordinates = {{ result.route_coordinates|safe }};
     var routePredictions = {{ result.route_predictions|safe }};
+    console.log(routeCoordinates);
+    console.log(routePredictions);
 
     // Harita görünüm alanını ayarla
     if (routeCoordinates.length > 0) {
@@ -246,60 +250,52 @@ Tahmini Sonucu - İstanbul Trafik Asistanı{% endblock %} {% block extra_head %}
       map.fitBounds([startPoint, endPoint], {padding: [50, 50]});
     }
 
-    // Başlangıç ve varış işaretleyicileri
-    var startIcon = L.icon({
-      iconUrl: '{% static "trafik_app/img/start-marker.png" %}',
-      iconSize: [32, 32],
-      iconAnchor: [16, 32],
-      popupAnchor: [0, -32]
-    });
-
-    var endIcon = L.icon({
-      iconUrl: '{% static "trafik_app/img/end-marker.png" %}',
-      iconSize: [32, 32],
-      iconAnchor: [16, 32],
-      popupAnchor: [0, -32]
-    });
-
-    L.marker(startPoint, {icon: startIcon}).addTo(map)
+    // Başlangıç ve varış işaretleyicileri (varsayılan Leaflet ikonları kullan)
+    // Özel ikonlar yerine varsayılan marker kullan
+    var startMarker = L.marker(startPoint).addTo(map)
       .bindPopup("<b>Başlangıç Noktası</b>").openPopup();
 
-    L.marker(endPoint, {icon: endIcon}).addTo(map)
+    var endMarker = L.marker(endPoint).addTo(map)
       .bindPopup("<b>Varış Noktası</b>");
 
     // Rotayı çiz
     if (routeCoordinates.length > 0) {
-      // Rota polilinini çiz
+      // Tüm koordinatları çizgi olarak birleştir
       var latlngs = routeCoordinates.map(function(point) {
         return [point[0], point[1]];
       });
 
+      // Ana rotayı belirgin şekilde çiz
       var routePath = L.polyline(latlngs, {
         color: "{{ result.avg_traffic_color }}",
-        weight: 5,
-        opacity: 0.7
+        weight: 6,
+        opacity: 0.9
       }).addTo(map);
 
-      // Rota üzerindeki noktalara göre trafik gösterimi
+      // Daireler yerine renkli çizgi parçaları oluştur
       if (routePredictions.length > 0) {
-        routePredictions.forEach(function(prediction, index) {
-          // Her 3 noktada bir göster (performans için)
-          if (index % 3 === 0) {
-            var circle = L.circle([prediction.lat, prediction.lng], {
-              color: prediction.traffic_color,
-              fillColor: prediction.traffic_color,
-              fillOpacity: 0.5,
-              radius: 100
+        // Rotanın her parçası için ayrı renkte çizgiler oluştur
+        for (var i = 0; i < routePredictions.length; i++) {
+          if (i < routeCoordinates.length - 1) {
+            var segmentStart = [routeCoordinates[i][0], routeCoordinates[i][1]];
+            var segmentEnd = [routeCoordinates[i+1][0], routeCoordinates[i+1][1]];
+
+            var segmentPath = L.polyline([segmentStart, segmentEnd], {
+              color: routePredictions[i].traffic_color,
+              weight: 8,
+              opacity: 0.8
             }).addTo(map);
 
-            circle.bindPopup("<b>Trafik Seviyesi:</b> " +
+            // Her segment için popup bilgisi ekle
+            var prediction = routePredictions[i];
+            segmentPath.bindPopup("<b>Trafik Seviyesi:</b> " +
               ["Çok Düşük", "Düşük", "Orta", "Yüksek", "Çok Yüksek"][prediction.traffic_level] +
               "<br>Tahmin: " + prediction.prediction.toFixed(2));
           }
-        });
+        }
       }
     } else {
-      // API'den tahmin edilen rotayı kullan (varsa)
+      // API'den tahmin edilen rotayı kullan
       var routingControl = L.Routing.control({
         waypoints: [
           L.latLng(startPoint[0], startPoint[1]),
@@ -307,14 +303,12 @@ Tahmini Sonucu - İstanbul Trafik Asistanı{% endblock %} {% block extra_head %}
         ],
         routeWhileDragging: false,
         addWaypoints: false,
-        createMarker: function() { return null; },
+        createMarker: function() { return null; }, // Marker'ları yukarıda zaten oluşturduk
         lineOptions: {
-          styles: [{color: "{{ result.avg_traffic_color }}", opacity: 0.7, weight: 5}]
-        }
+          styles: [{color: "{{ result.avg_traffic_color }}", opacity: 0.8, weight: 6}]
+        },
+        show: false // Rota kontrolünü gösterme
       }).addTo(map);
-
-      // Rota hesaplama işlemini gizle
-      routingControl.hide();
     }
   {% endif %}
 </script>

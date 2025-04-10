@@ -6,6 +6,9 @@ from .forms import TrafikForm
 import json
 from datetime import datetime
 import numpy as np
+import os
+import joblib
+from django.conf import settings
 
 
 def get_turkish_day_name(day_of_week):
@@ -52,27 +55,62 @@ def tahmin(request):
             hour = date_obj.hour
             minute = date_obj.minute
             day_of_week = date_obj.weekday()  # 0-6 arası (Pazartesi-Pazar)
-        except ValueError:
+            
+            # Tarih ve saat formatını hazırla - model fonksiyonları için
+            formatted_date = date_obj.strftime('%Y-%m-%d')
+            formatted_time = date_obj.strftime('%H:%M')
+        except ValueError as e:
             # Tarih/saat biçimi hatalıysa varsayılan değerler kullan
+            print(f"Tarih/saat biçimi hatalı: {e}")
             hour = 8
             minute = 0
             day_of_week = 0
+            formatted_date = "2023-01-01"  # Pazartesi varsayılan
+            formatted_time = "08:00" 
         
         # Tek nokta mı yoksa rota mı olduğuna göre işlem yap
         if route_type == 'single':
             # Tek nokta tahmini
-            lat = float(request.POST.get('lat', 0))
-            lng = float(request.POST.get('lng', 0))
+            try:
+                lat = float(request.POST.get('lat', 0))
+                lng = float(request.POST.get('lng', 0))
+            except ValueError:
+                lat = 41.0082  # İstanbul varsayılan
+                lng = 28.9784
             
-            # Modele girdi verilerini hazırla
-            input_data = [lat, lng, hour, minute, day_of_week]
+            # Tahmin yapmak için model yükle
+            model = model_utils.load_model()
             
-            # Tahmin yap
-            prediction = predict_traffic(input_data)
+            # Tahmin yap - model bir sözlük olduğunda doğru model seçiliyor
+            if isinstance(model, dict) and 'speed_model' in model:
+                # X verisini hazırla - modelin beklediği gibi 6 özellik içermeli
+                speed_limit = 50  # Varsayılan hız limiti
+                distance = 1.0    # Varsayılan mesafe (km)
+                sample_size = 10000  # Varsayılan örnek sayısı
+                traffic_density = sample_size / distance  # Varsayılan yoğunluk
+                
+                # Eğer scaler varsa ölçeklendirme yap
+                scaler_path = os.path.join(settings.BASE_DIR, 'models', 'istanbul_scaler.joblib')
+                
+                X = np.array([[speed_limit, distance, sample_size, traffic_density, lat, lng]])
+                
+                if os.path.exists(scaler_path):
+                    try:
+                        scaler = joblib.load(scaler_path)
+                        X_scaled = scaler.transform(X)
+                        prediction = model['speed_model'].predict(X_scaled)[0]
+                    except Exception as e:
+                        print(f"Ölçeklendirme hatası: {e}")
+                        prediction = model['speed_model'].predict(X)[0]
+                else:
+                    prediction = model['speed_model'].predict(X)[0]
+            else:
+                # model_utils üzerinden tahmin yap
+                prediction = model_utils.predict_traffic(model, formatted_date, formatted_time, lat, lng)
             
             # Trafik seviyesini ve rengini al
-            traffic_level = get_traffic_level(prediction)
-            traffic_color = get_traffic_color(traffic_level)
+            traffic_level = model_utils.get_traffic_level(prediction)
+            traffic_color = model_utils.get_traffic_color(traffic_level)
             
             # Sonuç nesnesini oluştur
             result = {
@@ -107,40 +145,67 @@ def tahmin(request):
                 start_lat, start_lng = 41.0082, 28.9784
                 end_lat, end_lng = 41.0255, 29.0097
             
-            # Rotadaki her nokta için trafik tahmini yap
-            route_predictions = []
-            route_traffic_levels = []
+            # Tahmin yapmak için model yükle
+            model = model_utils.load_model()
             
-            for point in route_coordinates:
-                if len(point) >= 2:
-                    lat, lng = point[0], point[1]
-                    input_data = [lat, lng, hour, minute, day_of_week]
-                    prediction = predict_traffic(input_data)
-                    traffic_level = get_traffic_level(prediction)
-                    traffic_color = get_traffic_color(traffic_level)
-                    
-                    route_predictions.append({
-                        'lat': lat,
-                        'lng': lng,
-                        'prediction': float(prediction),
-                        'traffic_level': traffic_level,
-                        'traffic_color': traffic_color
-                    })
-                    
-                    route_traffic_levels.append(traffic_level)
+            # Tarih ve saat formatını hazırla
+            formatted_date = date_obj.strftime('%Y-%m-%d')
+            formatted_time = date_obj.strftime('%H:%M')
             
-            # Ortalama trafik seviyesini hesapla
-            if route_traffic_levels:
-                avg_traffic_level = round(sum(route_traffic_levels) / len(route_traffic_levels))
+            # Rota tahmini yap
+            if route_coordinates:
+                # Model yapısına göre rota tahmini yap
+                if isinstance(model, dict) and 'speed_model' in model:
+                    # Her nokta için tahmin yap
+                    route_predictions = []
+                    for point in route_coordinates:
+                        lat, lng = point
+                        # X verisini hazırla - modelin beklediği gibi 6 özellik içermeli
+                        speed_limit = 50  # Varsayılan hız limiti
+                        distance_segment = 1.0  # Varsayılan mesafe (km) - segment başına
+                        sample_size = 10000  # Varsayılan örnek sayısı
+                        traffic_density = sample_size / distance_segment  # Varsayılan yoğunluk
+                        
+                        X = np.array([[speed_limit, distance_segment, sample_size, traffic_density, lat, lng]])
+                        
+                        # Eğer scaler varsa ölçeklendirme yap
+                        scaler_path = os.path.join(settings.BASE_DIR, 'models', 'istanbul_scaler.joblib')
+                        
+                        if os.path.exists(scaler_path):
+                            try:
+                                scaler = joblib.load(scaler_path)
+                                X_scaled = scaler.transform(X)
+                                prediction = model['speed_model'].predict(X_scaled)[0]
+                            except Exception as e:
+                                print(f"Rota ölçeklendirme hatası: {e}")
+                                prediction = model['speed_model'].predict(X)[0]
+                        else:
+                            prediction = model['speed_model'].predict(X)[0]
+                        
+                        # Trafik seviyesi ve renk
+                        traffic_level = model_utils.get_traffic_level(prediction)
+                        traffic_color = model_utils.get_traffic_color(traffic_level)
+                        
+                        route_predictions.append({
+                            'lat': lat,
+                            'lng': lng,
+                            'prediction': prediction,
+                            'traffic_level': traffic_level,
+                            'traffic_color': traffic_color
+                        })
+                else:
+                    # model_utils üzerinden rota tahmini yap
+                    route_predictions = model_utils.predict_route(model, formatted_date, formatted_time, route_coordinates)
+                
+                avg_traffic_level, avg_traffic_color = model_utils.calculate_average_traffic(route_predictions)
+                estimated_speed = model_utils.estimate_speed(avg_traffic_level)
+                estimated_duration = model_utils.estimate_duration(distance, avg_traffic_level)
             else:
+                route_predictions = []
                 avg_traffic_level = 0
-            
-            # Ortalama trafik rengi
-            avg_traffic_color = get_traffic_color(avg_traffic_level)
-            
-            # Ortalama hız tahmini (varsayılan)
-            estimated_speed = max(10, 60 - (avg_traffic_level * 10))
-            estimated_duration = (distance / estimated_speed) * 60  # dakika cinsinden
+                avg_traffic_color = model_utils.get_traffic_color(avg_traffic_level)
+                estimated_speed = model_utils.estimate_speed(avg_traffic_level)
+                estimated_duration = model_utils.estimate_duration(distance, avg_traffic_level)
             
             # Sonuç nesnesini oluştur
             result = {
@@ -153,7 +218,7 @@ def tahmin(request):
                 'avg_traffic_color': avg_traffic_color,
                 'distance': distance,
                 'estimated_speed': estimated_speed,
-                'estimated_duration': round(estimated_duration),
+                'estimated_duration': estimated_duration,
                 'date': date_obj.strftime('%d.%m.%Y'),
                 'time': date_obj.strftime('%H:%M')
             }
