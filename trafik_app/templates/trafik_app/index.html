@@ -1,6 +1,11 @@
+
+
 {% extends 'trafik_app/base.html' %} {% block title %}Ana Sayfa - İstanbul
-Trafik Tahmin Sistemi{% endblock %} {% block extra_head %}
-<link rel="stylesheet" href="/static/trafik_app/css/custom.css" />
+Trafik Tahmin Sistemi{% endblock %} 
+
+{% block extra_head %}
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/custom.css' %}" />
 {% endblock %} {% block content %}
 <div class="row">
   <div class="col-12">
@@ -72,7 +77,7 @@ Trafik Tahmin Sistemi{% endblock %} {% block extra_head %}
   </div>
 </div>
 {% endblock %} {% block extra_js %}
-<script src="/static/trafik_app/js/map_utils.js"></script>
+<script src="{% static 'js/map_utils.js' %}"></script>
 <script>
   document.addEventListener('DOMContentLoaded', function() {
       console.log('Ana sayfa yüklendi, harita hazırlanıyor...');
