@@ -6,6 +6,6 @@ __pycache__/
 *.pyw
 *.pyz
 datasets/
-
+models.zip
 *.joblib
 
