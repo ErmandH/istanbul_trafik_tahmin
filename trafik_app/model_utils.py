@@ -14,6 +14,7 @@ from datetime import datetime
 import pickle
 from .models import TrafikHeatmapCache
 from django.core.cache import cache
+import gc
 
 # Veri ve model dosya yolları
 ISTANBUL_DATA_FILE = os.path.join(settings.BASE_DIR, 'datasets', 'results_istanbul_trafik.json')
@@ -90,7 +91,7 @@ def load_and_process_data(data_file=ACTIVE_DATA_FILE):
         return pd.DataFrame()
 
 def train_istanbul_model():
-    """İstanbul trafik tahmin modelini eğitir"""
+    """İstanbul trafik tahmin modelini optimize edilmiş şekilde eğitir"""
     print("İstanbul trafik modeli eğitiliyor...")
     df = load_and_process_data(ISTANBUL_DATA_FILE)
     
@@ -125,12 +126,26 @@ def train_istanbul_model():
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
     
-    # Ortalama hız tahmin modeli
-    speed_model = RandomForestRegressor(n_estimators=200, random_state=42, n_jobs=-1)
+    # Ortalama hız tahmin modeli - optimize edilmiş parametreler
+    speed_model = RandomForestRegressor(
+        n_estimators=100,  # Daha az ağaç
+        max_depth=10,      # Daha sığ ağaçlar
+        min_samples_split=10,
+        min_samples_leaf=5,
+        random_state=42,
+        n_jobs=-1
+    )
     speed_model.fit(X_train_scaled, y_speed_train)
     
-    # Seyahat süresi tahmin modeli
-    time_model = RandomForestRegressor(n_estimators=200, random_state=42, n_jobs=-1)
+    # Seyahat süresi tahmin modeli - optimize edilmiş parametreler
+    time_model = RandomForestRegressor(
+        n_estimators=100,  # Daha az ağaç
+        max_depth=10,      # Daha sığ ağaçlar
+        min_samples_split=10,
+        min_samples_leaf=5,
+        random_state=42,
+        n_jobs=-1
+    )
     time_model.fit(X_train_scaled, y_time_train)
     
     # Modelleri birleştir
@@ -155,6 +170,10 @@ def train_istanbul_model():
     
     print(f"Hız tahmin modeli R² skoru: {speed_score:.4f}")
     print(f"Süre tahmin modeli R² skoru: {time_score:.4f}")
+    
+    # Hafıza temizliği
+    del X_train, X_test, y_speed_train, y_speed_test, y_time_train, y_time_test
+    gc.collect()
     
     return {
         'speed_score': speed_score,
@@ -410,8 +429,8 @@ def train_model_command():
     
     return result
 
-# Model yükleme fonksiyonu
 def load_model():
+    """Modeli optimize edilmiş şekilde yükler"""
     model_path = os.path.join(settings.BASE_DIR, 'models', 'istanbul_trafik_model.joblib')
     
     # Eğer model bulunamazsa, modeli eğit ve oluştur
@@ -420,9 +439,22 @@ def load_model():
         print("Model eğitiliyor...")
         train_istanbul_model()
     
-    # Modeli yükle
     try:
-        return joblib.load(model_path)
+        # Hafıza optimizasyonu için garbage collection'ı tetikle
+        gc.collect()
+        
+        # Modeli yükle
+        model = joblib.load(model_path)
+        
+        # Eğer model bir sözlük ise ve her iki model de varsa
+        if isinstance(model, dict) and 'speed_model' in model and 'time_model' in model:
+            # Sadece hız modelini tut, diğerini temizle
+            speed_model = model['speed_model']
+            del model['time_model']
+            gc.collect()
+            return {'speed_model': speed_model}
+        
+        return model
     except Exception as e:
         print(f"Model yükleme hatası: {e}")
         # Yedek yol - ilk modeli eğit ve döndür
